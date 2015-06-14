@@ -1,9 +1,5 @@
 var nacl = (typeof window !== 'undefined') ? window.nacl : require('./' + (process.env.NACL_SRC || 'cryptobox.js'));
 
-
-var enc = nacl.util.encodeBase64,
-    dec = nacl.util.decodeBase64;
-
 var pk1 = new Uint8Array(32),
     sk1 = new Uint8Array(32),
     pk2 = new Uint8Array(32),
