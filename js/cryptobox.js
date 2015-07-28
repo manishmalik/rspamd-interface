@@ -1,6 +1,7 @@
 /*
    Rspamd Cryptobox - Curve25519-XChacha20-Poly1305 Authenticated Encryption.
    Copyright (C) 2015 Manish Malik <manishmalikkvs@gmail.com>
+   Copyright (C) 2014 Dmitry Chetnykh and Devi Mandiri
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -136,34 +137,45 @@ var Chacha20 = function(key, nonce, counter) {
         quarterRound(this.input, 3, 4, 9,14);
     }
 
-    this.input[12] = counter;
-    this.input[13] = 0;
-    this.input[14] = U8TO32_LE(nonce, 16);
-    this.input[15] = U8TO32_LE(nonce, 20);
+    /* Setting counter and remaining bytes of Nonce */
+    this.input[8] = counter;
+    this.input[9] = 0;
+    this.input[10] = U8TO32_LE(nonce, 16);
+    this.input[11] = U8TO32_LE(nonce, 20);
   }
-  else if (nonce.length==12)
-  {
-    this.input[12] = counter;
-    this.input[13] = U8TO32_LE(nonce, 0);
-    this.input[14] = U8TO32_LE(nonce, 4);
-    this.input[15] = U8TO32_LE(nonce, 8);
-  }
-  else{
-    this.input[12] = counter;
-    this.input[13] = 0;
-    this.input[14] = U8TO32_LE(nonce, 0);
-    this.input[15] = U8TO32_LE(nonce, 4);
-    
+  else if(nonce.length<24){
+    console.log("Nonce Size is less than 24 bytes");
   }
 };
 
 Chacha20.prototype.encrypt = function(dst, src, len) {
   var x = new Uint32Array(16);
+  var j = new Uint32Array(12);
   var output = new Uint8Array(64);
   var i, dpos = 0, spos = 0;
 
+  j[0]=this.input[0];
+  j[1]=this.input[1];
+  j[2]=this.input[2];
+  j[3]=this.input[3];
+  j[4]=this.input[12];
+  j[5]=this.input[13];
+  j[6]=this.input[14];
+  j[7]=this.input[15];
+  //Setting Counter and Nonce
+  j[8]=this.input[8];
+  j[9]=this.input[9];
+  j[10]=this.input[10];
+  j[11]=this.input[11];
+
   while (len > 0 ) {
-    for (i = 16; i--;) x[i] = this.input[i];
+    x[0] = 1634760805;
+    x[1] =  857760878;
+    x[2] = 2036477234;
+    x[3] = 1797285236;
+    //for (i = 16; i--;) x[i] = this.input[i];
+    for (i = 0; i<12;i++) x[i+4] = j[i];
+
     for (i = 20; i > 0; i -= 2) {
       quarterRound(x, 0, 4, 8,12);
       quarterRound(x, 1, 5, 9,13);
@@ -174,13 +186,23 @@ Chacha20.prototype.encrypt = function(dst, src, len) {
       quarterRound(x, 2, 7, 8,13);
       quarterRound(x, 3, 4, 9,14);
     }
-    for (i = 16; i--;) x[i] += this.input[i];
+    x[0] += 1634760805;
+    x[1] +=  857760878;
+    x[2] += 2036477234;
+    x[3] += 1797285236;
+    //for (i = 16; i--;) x[i] += this.input[i];
+    for (i = 0; i<16;i++) x[i+4] += j[i];
+
     for (i = 16; i--;) U32TO8_LE(output, 4*i, x[i]);
 
-    this.input[12] += 1;
-    if (!this.input[12]) {
-      this.input[13] += 1;
+    j[8] += 1;
+    if (!j[8]) {
+      j[9] += 1;
     }
+    //storing the updated counter 
+    this.input[8]=j[8];
+    this.input[9]=j[9];
+
     if (len <= 64) {
       for (i = len; i--;) {
         dst[i+dpos] = src[i+spos] ^ output[i];
@@ -201,7 +223,49 @@ Chacha20.prototype.keystream = function(dst, len) {
   this.encrypt(dst, dst, len);
 };
 
+Chacha20.prototype.hchacha20 =  function(key,iv,out)
+{
+  this.input = new Uint32Array(16);
 
+  // https://tools.ietf.org/html/draft-irtf-cfrg-chacha20-poly1305-01#section-2.3
+  this.input[0] = 1634760805;
+  this.input[1] =  857760878;
+  this.input[2] = 2036477234;
+  this.input[3] = 1797285236;
+  this.input[4] = U8TO32_LE(key, 0);
+  this.input[5] = U8TO32_LE(key, 4);
+  this.input[6] = U8TO32_LE(key, 8);
+  this.input[7] = U8TO32_LE(key, 12);
+  this.input[8] = U8TO32_LE(key, 16);
+  this.input[9] = U8TO32_LE(key, 20);
+  this.input[10] = U8TO32_LE(key, 24);
+  this.input[11] = U8TO32_LE(key, 28);
+  this.input[12] = U8TO32_LE(iv, 0);
+  this.input[13] = U8TO32_LE(iv, 4);
+  this.input[14] = U8TO32_LE(iv, 8);
+  this.input[15] = U8TO32_LE(iv, 12);
+
+  //20 rounds
+  for (var i = 20; i > 0; i -= 2) {
+      quarterRound(this.input, 0, 4, 8,12);
+      quarterRound(this.input, 1, 5, 9,13);
+      quarterRound(this.input, 2, 6,10,14);
+      quarterRound(this.input, 3, 7,11,15);
+      quarterRound(this.input, 0, 5,10,15);
+      quarterRound(this.input, 1, 6,11,12);
+      quarterRound(this.input, 2, 7, 8,13);
+      quarterRound(this.input, 3, 4, 9,14);
+  }
+
+  U32TO8_LE(out,0,this.input[0]);
+  U32TO8_LE(out,4,this.input[1]);
+  U32TO8_LE(out,8,this.input[2]);
+  U32TO8_LE(out,12,this.input[3]);
+  U32TO8_LE(out,16,this.input[12]);
+  U32TO8_LE(out,20,this.input[13]);
+  U32TO8_LE(out,24,this.input[14]);
+  U32TO8_LE(out,28,this.input[15]);
+}
 /*
 * Port of Andrew Moon's Poly1305-donna-16. Public domain.
 * https://github.com/floodyberry/poly1305-donna
@@ -1131,7 +1195,7 @@ function crypto_box_beforenm(k, y, x) {
   var s = new Uint8Array(32);
   crypto_scalarmult(s, x, y);
   var chacha = new Chacha20(s,_0,0);
-  return chacha.keystream(k,32);
+  return chacha.hchacha20(s,_0,k);
 }
 
 var crypto_box_afternm = crypto_secretbox;

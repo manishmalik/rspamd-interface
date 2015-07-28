@@ -19,6 +19,46 @@
 (function() { $(document).ready(function(){
 // begin
 
+	var nacl = (typeof window !== 'undefined') ? window.nacl : require('./' + (process.env.NACL_SRC || 'cryptobox.js'));
+	var enc = nacl.util.encodeBase64,
+    	dec = nacl.util.decodeBase64;
+    
+	var pk1 = new Uint8Array(32),
+    sk1 = new Uint8Array(32),
+    pk2 = new Uint8Array(32),
+    sk2 = new Uint8Array(32),
+    key= new Uint8Array(32),
+    iterations = 1000,    // Number of iterations for fuzz testing 
+    nonce = new Uint8Array(24);
+	console.log("\n \t Test - Rspamd JS Cryptobox: \n");
+
+/*
+    8 bytes of Random data 
+*/
+
+	var data = new Uint8Array(8);
+	data = nacl.randomBytes(8);
+	keypair=nacl.box.keyPair();
+	pk1 = keypair['publicKey'];
+	sk1 = keypair['secretKey'];
+	// console.log(pk1);
+	// console.log(sk1);
+	keypair=nacl.box.keyPair();
+	pk2 = keypair['publicKey'];
+	sk2 = keypair['secretKey'];
+	// console.log(pk2);
+	// console.log(sk2);
+	nonce = nacl.randomBytes(24);
+	var ctx = new Uint8Array(data.length + 16);
+
+	ctx = nacl.box(data,nonce,pk2,sk1);
+
+	var pt = new Uint8Array(ctx.length - 16);
+	pt = nacl.box.open(ctx,nonce,pk1,sk2);
+	if(pt===false)
+		console.log(" Baseline Encryption Test (8 Bytes random msg): FAILED\n");
+	else
+		console.log(" Baseline Encryption Test (8 Bytes random msg):  PASSED\n");
 	$.cookie.json = true;
 
 	$('#disconnect').on('click', function(event) {
@@ -550,6 +590,64 @@
 		$(target).parent().removeAttr('style');
 	});
 
+	// Retrieving public key on pressing learning tab
+	$('#learning_nav').on('click',function(){
+		$.ajax({
+				global: false,
+				dataType: 'json',
+				type: 'GET',
+				url: 'getpk',
+				beforeSend: function (xhr) {
+					xhr.setRequestHeader('Password', getPassword());
+				},
+				success: function(data) {
+					if (!supportsSessionStorage()) {
+						$.cookie('rspamdsession', data, { expires: 1 }, { path: '/' });
+						$.cookie('rspamdpasswd', password, { expires: 1 }, { path: '/' });
+					} else {
+						sessionStorage.setItem('Password', password);
+						sessionStorage.setItem('publicKey', JSON.stringify(data));
+					}
+				},
+				error:  function(data) {
+					alertMessage('alert-modal alert-error', 'Oops, Failed to received publickey');
+				},
+				statusCode: {
+					404: function() {
+						alertMessage('alert-modal alert-error', 'Cannot getpk, host not found');
+					}
+				}
+			});
+	});
+	// Retrieving public key on pressing scan tab
+	$('#scan_nav').on('click',function(){
+		$.ajax({
+				global: false,
+				dataType: 'json',
+				type: 'GET',
+				url: 'getpk',
+				beforeSend: function (xhr) {
+					xhr.setRequestHeader('Password', getPassword());
+				},
+				success: function(data) {
+					if (!supportsSessionStorage()) {
+						$.cookie('rspamdsession', data, { expires: 1 }, { path: '/' });
+						$.cookie('rspamdpasswd', password, { expires: 1 }, { path: '/' });
+					} else {
+						sessionStorage.setItem('Password', password);
+						sessionStorage.setItem('publicKey', JSON.stringify(data));
+					}
+				},
+				error:  function(data) {
+					alertMessage('alert-modal alert-error', 'Oops, Failed to received publickey');
+				},
+				statusCode: {
+					404: function() {
+						alertMessage('alert-modal alert-error', 'Cannot getpk, host not found');
+					}
+				}
+			});
+	});
 	// @spam upload form
 	function createUploaders() {
 		var spamUploader = new qq.FineUploader({
@@ -684,7 +782,7 @@
 	}
 
 	// @upload text
-	function uploadText(data, source) {
+	function uploadText(data, source,additional) {
 		if (source === 'spam') {
 			var url = 'learnspam';
 		} if (source === 'ham') {
@@ -701,6 +799,8 @@
 			url: url,
 			beforeSend: function (xhr) {
 				xhr.setRequestHeader('Password', getPassword());
+				//xhr.setRequestHeader('Nonce',additional[0]);
+				xhr.setRequestHeader('Key'+additional);
 			},
 			success: function(data) {
 				cleanTextUpload(source);
@@ -722,8 +822,28 @@
 		});
 	}
 
+	/*
+	// For debugging
+	if (!supportsSessionStorage()) {
+		var data = $.cookie('rspamdsession');
+	} else {
+		var data = JSON.parse(sessionStorage.getItem('publicKey'));
+	}
+	if(data !==null){
+		$.each(data,function(i,item){
+			console.log(i,item,item.length,typeof(item));
+		});
+		//console.log(data['public_key']);
+		var pk = dec(data['public_key']);
+		console.log(pk);}
+	
+	// console.log(data['publickey'],typeof(data['publickey']));
+
+	//end of debugging 
+	*/
+
 	// @upload text
-	function scanText(data) {
+	function scanText(data,additional) {
 
 		var url = 'scan';
 		var items = [];
@@ -735,6 +855,8 @@
 			url: url,
 			beforeSend: function (xhr) {
 				xhr.setRequestHeader('Password', getPassword());
+				//xhr.setRequestHeader('Nonce',additional[0]);
+				xhr.setRequestHeader('Key',additional);
 			},
 			success: function(input) {
 				var data = input['default'];
@@ -813,13 +935,75 @@
 			data.string=data.toString();
 		
 		}
-		else
+		else{
 			var data = $('#' + source + 'TextSource').val();
+		}
+		if (!supportsSessionStorage()) {
+			var sessionData = $.cookie('rspamdsession');
+		}else {
+			var sessionData = JSON.parse(sessionStorage.getItem('publicKey'));
+		}
+		var pk = dec(sessionData['public_key']);
+		console.log("Public Key from the controller",pk);
+		var cSecret = new Uint8Array(32);
+		var cPublic = new Uint8Array(32);
+		var sPublic = new Uint8Array(32);
+		var nonce = new Uint8Array(24);
+		var msg_enc = nacl.util.decodeUTF8(data);
+		
+		console.log("UTF8 for PT :",msg_enc);
+	
+		keypair=nacl.box.keyPair();
+		
+		cPublic = keypair['publicKey'];
+		cSecret = keypair['secretKey'];
+
+		if(pk.length<32)
+		{
+			for(var i =0 ; i< pk.length ; i++)
+				sPublic[i] = pk[i];
+			//free(pk);
+		}
+		else
+		{
+			for(var i=0 ; i< 32; i ++)
+				sPublic[i] = pk[i];
+			//free(pk);
+		}
+
+		nonce = nacl.randomBytes(24);
+		data = nacl.box(msg_enc,nonce,sPublic,cSecret);
+		console.log("Encrypted Text Message + MAC: ",data);
+		var encrypted_data = new Uint8Array(24+data.length);
+		for(var i=0;i<24;i++){
+			encrypted_data[i] = nonce[i];
+		}
+		for(var i=0; i<16;i++){
+			encrypted_data[24+i]=data[data.length - 16 + i];
+		}
+		for(var i=0;i<data.length-16;i++){
+			encrypted_data[24+16+i]=data[i];
+		}
+		console.log("Nonce+MAC+cipher : ",encrypted_data);
+
+		data = enc(encrypted_data);
+		console.log("Encoded Encrypted Text: ",data);
+
+		// TODO : Remove additional
+		var additional = new Array(2);
+		var pbk;
+		//additional[0] = enc(nonce);
+		//console.log("Encoded Nonce : ",additional[0]);
+		additional[0] = enc(cPublic);
+		additional[1] = sessionData['key_id'];
+		console.log("Encoded Public Key (of Web Client): ",additional[0]);
+		pbk = additional[1] + ' = ' +additional[0];
+		console.log(pbk);
 		if (data.length > 0) {
 			if (source == 'scan') {
-				scanText(data);
+				scanText(data,pbk);
 			} else {
-				uploadText(data, source);
+				uploadText(data, source,pbk);
 			}
 		}
 		return false;
