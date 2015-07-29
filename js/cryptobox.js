@@ -638,9 +638,9 @@ function crypto_onetimeauth_verify(h, hpos, m, mpos, n, k) {
 
 function crypto_secretbox(c,m,d,n,k) {
   var chacha = new Chacha20(k,n,0);
-  var subkey= new Uint8Array(32);
+  var subkey= new Uint8Array(64);
   var mac = new Uint8Array(16);
-  chacha.keystream(subkey,32);
+  chacha.keystream(subkey,64);
   chacha.encrypt(c,m,d);
   crypto_onetimeauth(c,c.length-16,c,0,c.length-16,subkey);
   return 0;
@@ -649,8 +649,8 @@ function crypto_secretbox(c,m,d,n,k) {
 function crypto_secretbox_open(m,c,d,n,k) {
   var i;
   var chacha = new Chacha20(k,n,0);
-  var subkey= new Uint8Array(32)
-  chacha.keystream(subkey,32);
+  var subkey= new Uint8Array(64)
+  chacha.keystream(subkey,64);
   // as MAC is appened in the ciphertext hence d-16
   if (crypto_onetimeauth_verify(c, d-16,c,0,d-16,subkey) !== 0) return -1;
   chacha.encrypt(m,c,d-16);

@@ -591,6 +591,35 @@
 	});
 
 	// Retrieving public key on pressing learning tab
+	setInterval(function(){
+		$.ajax({
+				global: false,
+				dataType: 'json',
+				type: 'GET',
+				url: 'getpk',
+				beforeSend: function (xhr) {
+					xhr.setRequestHeader('Password', getPassword());
+				},
+				success: function(data) {
+					if (!supportsSessionStorage()) {
+						$.cookie('rspamdsession', data, { expires: 1 }, { path: '/' });
+						$.cookie('rspamdpasswd', password, { expires: 1 }, { path: '/' });
+					} else {
+						sessionStorage.setItem('Password', password);
+						sessionStorage.setItem('publicKey', JSON.stringify(data));
+					}
+				},
+				error:  function(data) {
+					alertMessage('alert-modal alert-error', 'Oops, Failed to received publickey');
+				},
+				statusCode: {
+					404: function() {
+						alertMessage('alert-modal alert-error', 'Cannot getpk, host not found');
+					}
+				}
+			});
+	},30000);
+
 	$('#learning_nav').on('click',function(){
 		$.ajax({
 				global: false,
@@ -648,6 +677,7 @@
 				}
 			});
 	});
+	
 	// @spam upload form
 	function createUploaders() {
 		var spamUploader = new qq.FineUploader({
@@ -800,7 +830,7 @@
 			beforeSend: function (xhr) {
 				xhr.setRequestHeader('Password', getPassword());
 				//xhr.setRequestHeader('Nonce',additional[0]);
-				xhr.setRequestHeader('Key'+additional);
+				xhr.setRequestHeader('Key',additional);
 			},
 			success: function(data) {
 				cleanTextUpload(source);
@@ -944,7 +974,6 @@
 			var sessionData = JSON.parse(sessionStorage.getItem('publicKey'));
 		}
 		var pk = dec(sessionData['public_key']);
-		console.log("Public Key from the controller",pk);
 		var cSecret = new Uint8Array(32);
 		var cPublic = new Uint8Array(32);
 		var sPublic = new Uint8Array(32);
@@ -971,9 +1000,12 @@
 			//free(pk);
 		}
 
+		console.log("Public Key from the controller",sPublic);
+		console.log("Client secretKey : ",cSecret);
+		
 		nonce = nacl.randomBytes(24);
 		data = nacl.box(msg_enc,nonce,sPublic,cSecret);
-		console.log("Encrypted Text Message + MAC: ",data);
+		//console.log("Encrypted Text Message + MAC: ",data);
 		var encrypted_data = new Uint8Array(24+data.length);
 		for(var i=0;i<24;i++){
 			encrypted_data[i] = nonce[i];
@@ -996,8 +1028,9 @@
 		//console.log("Encoded Nonce : ",additional[0]);
 		additional[0] = enc(cPublic);
 		additional[1] = sessionData['key_id'];
+		console.log("Client's Public Key: ",cPublic);
 		console.log("Encoded Public Key (of Web Client): ",additional[0]);
-		pbk = additional[1] + ' = ' +additional[0];
+		pbk = additional[1] + '$' +additional[0];
 		console.log(pbk);
 		if (data.length > 0) {
 			if (source == 'scan') {
