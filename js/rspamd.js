@@ -619,7 +619,7 @@
 				}
 			});
 	},30000);
-
+	/*
 	$('#learning_nav').on('click',function(){
 		$.ajax({
 				global: false,
@@ -677,7 +677,7 @@
 				}
 			});
 	});
-	
+	*/
 	// @spam upload form
 	function createUploaders() {
 		var spamUploader = new qq.FineUploader({
