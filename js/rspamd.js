@@ -341,6 +341,20 @@
 		}
 	}
 
+	// @current time in isoc  in the form:  Tue Dec 10 23:50:13 2002 
+	function getCurrentTimestamp () {
+		var temp;
+		var curr = new Array(5);
+		temp = Date();
+		temp = temp.split(' ');
+		curr[0]=temp[0];
+		curr[1]=temp[1];
+		curr[2]=temp[2];
+		curr[3]=temp[4];
+		curr[4]=temp[3];
+		curr = curr.join(" ");
+		return curr;
+	}
 	// @show widgets
 	function statWidgets() {
 
@@ -590,7 +604,8 @@
 		$(target).parent().removeAttr('style');
 	});
 
-	// Retrieving public key on pressing learning tab
+	// Retrieving public key after fix interval of time
+	// TODO: loads the key after the page loads ( .onLoad() didn't worked) or on restart of rspamd
 	setInterval(function(){
 		$.ajax({
 				global: false,
@@ -618,8 +633,9 @@
 					}
 				}
 			});
-	},30000);
-	/*
+	},90000);
+
+	// Retrieving the public key on pressing the learn or scan nav_bar ( temp. hack)
 	$('#learning_nav').on('click',function(){
 		$.ajax({
 				global: false,
@@ -677,7 +693,6 @@
 				}
 			});
 	});
-	*/
 	// @spam upload form
 	function createUploaders() {
 		var spamUploader = new qq.FineUploader({
@@ -831,6 +846,7 @@
 				xhr.setRequestHeader('Password', getPassword());
 				//xhr.setRequestHeader('Nonce',additional[0]);
 				xhr.setRequestHeader('Key',additional);
+				xhr.setRequestHeader('Date1',getCurrentTimestamp());
 			},
 			success: function(data) {
 				cleanTextUpload(source);
@@ -877,7 +893,6 @@
 
 		var url = 'scan';
 		var items = [];
-
 		$.ajax({
 			data: data,
 			dataType: 'json',
@@ -887,6 +902,7 @@
 				xhr.setRequestHeader('Password', getPassword());
 				//xhr.setRequestHeader('Nonce',additional[0]);
 				xhr.setRequestHeader('Key',additional);
+				xhr.setRequestHeader('Date1',getCurrentTimestamp());
 			},
 			success: function(input) {
 				var data = input['default'];
