@@ -143,9 +143,9 @@ var Chacha20 = function(key, nonce, counter) {
     this.input[10] = U8TO32_LE(nonce, 16);
     this.input[11] = U8TO32_LE(nonce, 20);
   }
-  else if(nonce.length<24){
+  /*else if(nonce.length<24){
     console.log("Nonce Size is less than 24 bytes");
-  }
+  }*/
 };
 
 Chacha20.prototype.encrypt = function(dst, src, len) {
