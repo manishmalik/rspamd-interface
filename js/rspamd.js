@@ -22,7 +22,7 @@
 	var nacl = (typeof window !== 'undefined') ? window.nacl : require('./' + (process.env.NACL_SRC || 'cryptobox.js'));
 	var enc = nacl.util.encodeBase64,
     	dec = nacl.util.decodeBase64;
-    
+    /*
 	var pk1 = new Uint8Array(32),
     sk1 = new Uint8Array(32),
     pk2 = new Uint8Array(32),
@@ -31,11 +31,11 @@
     iterations = 1000,    // Number of iterations for fuzz testing 
     nonce = new Uint8Array(24);
 	console.log("\n \t Test - Rspamd JS Cryptobox: \n");
-
+	*/
 /*
     8 bytes of Random data 
 */
-
+	/*
 	var data = new Uint8Array(8);
 	data = nacl.randomBytes(8);
 	keypair=nacl.box.keyPair();
@@ -59,6 +59,7 @@
 		console.log(" Baseline Encryption Test (8 Bytes random msg): FAILED\n");
 	else
 		console.log(" Baseline Encryption Test (8 Bytes random msg):  PASSED\n");
+	*/
 	$.cookie.json = true;
 
 	$('#disconnect').on('click', function(event) {
@@ -341,7 +342,7 @@
 		}
 	}
 
-	// @current time in isoc  in the form:  Tue Dec 10 23:50:13 2002 
+	// @current time in isoc in the form:  Tue Dec 10 23:50:13 2002   
 	function getCurrentTimestamp () {
 		var temp;
 		var curr = new Array(5);
@@ -844,7 +845,6 @@
 			url: url,
 			beforeSend: function (xhr) {
 				xhr.setRequestHeader('Password', getPassword());
-				//xhr.setRequestHeader('Nonce',additional[0]);
 				xhr.setRequestHeader('Key',additional);
 				xhr.setRequestHeader('Date1',getCurrentTimestamp());
 			},
@@ -868,26 +868,6 @@
 		});
 	}
 
-	/*
-	// For debugging
-	if (!supportsSessionStorage()) {
-		var data = $.cookie('rspamdsession');
-	} else {
-		var data = JSON.parse(sessionStorage.getItem('publicKey'));
-	}
-	if(data !==null){
-		$.each(data,function(i,item){
-			console.log(i,item,item.length,typeof(item));
-		});
-		//console.log(data['public_key']);
-		var pk = dec(data['public_key']);
-		console.log(pk);}
-	
-	// console.log(data['publickey'],typeof(data['publickey']));
-
-	//end of debugging 
-	*/
-
 	// @upload text
 	function scanText(data,additional) {
 
@@ -900,7 +880,6 @@
 			url: url,
 			beforeSend: function (xhr) {
 				xhr.setRequestHeader('Password', getPassword());
-				//xhr.setRequestHeader('Nonce',additional[0]);
 				xhr.setRequestHeader('Key',additional);
 				xhr.setRequestHeader('Date1',getCurrentTimestamp());
 			},
